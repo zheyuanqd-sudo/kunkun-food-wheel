@@ -16,7 +16,7 @@ async function waitForServer() {
 
 test.before(async()=>{
   temp=await mkdtemp(join(tmpdir(),'kunkun-test-'));
-  child=spawn(process.execPath,['server.mjs'],{cwd:root,env:{...process.env,PORT:String(port),DATA_FILE:join(temp,'store.json'),SESSION_SECRET:'test-secret'},stdio:'ignore'});
+  child=spawn(process.execPath,['server.mjs'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port),DATA_FILE:join(temp,'store.json'),SESSION_SECRET:'test-secret'},stdio:'ignore'});
   await waitForServer();
 });
 test.after(async()=>{child?.kill();await rm(temp,{recursive:true,force:true});});
@@ -57,9 +57,23 @@ test('管理员可以调整菜系顺序',async()=>{
   assert.equal(after.cuisines[0].name,'北京菜');
 });
 
+test('管理员可维护减脂餐和夜宵转盘内容',async()=>{
+  const image='data:image/jpeg;base64,dGVzdA==';
+  const fitness=await fetch(`http://127.0.0.1:${port}/api/fitness-meals`,{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie},body:JSON.stringify({name:'鸡胸糙米碗',image,ingredients:'鸡胸肉、糙米、西兰花',calories:'420 千卡'})});
+  assert.equal(fitness.status,201);
+  const snack=await fetch(`http://127.0.0.1:${port}/api/night-snacks`,{method:'POST',headers:{'Content-Type':'application/json','Cookie':cookie},body:JSON.stringify({name:'温牛奶',image,calories:'130 千卡'})});
+  assert.equal(snack.status,201);
+  const data=await (await fetch(`http://127.0.0.1:${port}/api/state`)).json();
+  assert.equal(data.fitnessMeals[0].ingredients,'鸡胸肉、糙米、西兰花');
+  assert.equal(data.nightSnacks[0].name,'温牛奶');
+});
+
 test('页面与静态资源可以打开',async()=>{
   const html=await (await fetch(`http://127.0.0.1:${port}/`)).text();
   assert.match(html,/坤坤今天吃什么～/);
+  assert.match(html,/菜系餐厅总览/);
+  assert.match(html,/坤坤减脂ing/);
+  assert.match(html,/半夜饿了/);
   assert.equal((await fetch(`http://127.0.0.1:${port}/app.js`)).status,200);
   assert.equal((await fetch(`http://127.0.0.1:${port}/styles.css`)).status,200);
   assert.equal((await fetch(`http://127.0.0.1:${port}/assets/kunkun-stars-1.jpg`)).status,200);
