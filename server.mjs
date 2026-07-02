@@ -211,7 +211,7 @@ async function serve(req,res,url){
   if(url.pathname.startsWith('/api/')) return api(req,res,url);
   const requested=url.pathname==='/'?'index.html':url.pathname.slice(1); const path=normalize(join(PUBLIC_DIR,requested));
   if(!path.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
-  try { const file=await readFile(path); res.writeHead(200,{'Content-Type':types[extname(path)]||'application/octet-stream','Cache-Control':isProduction?'public, max-age=3600':'no-store'}); res.end(file); }
+  try { const file=await readFile(path); res.writeHead(200,{'Content-Type':types[extname(path)]||'application/octet-stream','Cache-Control':'no-store'}); res.end(file); }
   catch { try { const file=await readFile(join(PUBLIC_DIR,'index.html')); res.writeHead(200,{'Content-Type':types['.html']});res.end(file); } catch { res.writeHead(404);res.end('Not found'); } }
 }
 
