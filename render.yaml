@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: kunkun-food-wheel
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATA_FILE
+        value: /var/data/store.json
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+    disk:
+      name: kunkun-data
+      mountPath: /var/data
+      sizeGB: 1

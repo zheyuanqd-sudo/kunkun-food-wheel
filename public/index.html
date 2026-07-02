@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#fff1f5">
+  <title>坤坤今天吃什么～</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="theme-art" aria-hidden="true">
+    <div class="theme-image theme-image-one"></div>
+    <div class="theme-image theme-image-two"></div>
+    <div class="theme-veil"></div>
+  </div>
+  <div class="floaty floaty-one">♡</div><div class="floaty floaty-two">✿</div><div class="floaty floaty-three">♡</div>
+  <header class="topbar">
+    <button class="brand" data-page="home"><span class="brand-badge">🍓</span><span>坤坤今天吃什么～</span></button>
+    <nav aria-label="主导航">
+      <button class="nav-btn active" data-page="home">抽菜系</button>
+      <button class="nav-btn" data-page="restaurant">抽餐厅</button>
+      <button class="nav-btn" data-page="history">今日记录</button>
+    </nav>
+    <button id="adminEntry" class="admin-entry" data-page="admin">管理入口</button>
+  </header>
+
+  <main>
+    <section id="homePage" class="page active">
+      <div class="hero-copy"><span class="eyebrow">TODAY'S LITTLE CHOICE</span><h1>坤坤今天吃什么～</h1><p>选择困难先放一放，让幸运转盘替你做决定吧！</p></div>
+      <div class="wheel-card">
+        <div class="decor decor-left">🍡</div><div class="decor decor-right">🍥</div>
+        <div class="wheel-wrap"><div class="pointer">▼</div><div id="cuisineWheel" class="wheel"></div><button id="spinCuisine" class="wheel-center"><span>转</span><small>一下</small></button></div>
+        <button id="spinCuisineBtn" class="primary-btn">帮坤坤选一个 <span>♥</span></button>
+        <p id="cuisineHint" class="hint">轻轻一点，命运的齿轮开始转动～</p>
+      </div>
+    </section>
+
+    <section id="restaurantPage" class="page">
+      <div class="section-heading"><span class="eyebrow">RESTAURANT WHEEL</span><h2>这顿去哪家？</h2><p>先选一个菜系，再转出今天的心动餐厅。</p></div>
+      <div class="picker-card">
+        <label for="cuisineSelect">想吃的菜系</label><select id="cuisineSelect"></select>
+      </div>
+      <div id="restaurantEmpty" class="empty-state hidden"><div class="empty-icon">🥣</div><h3>这里还空空的</h3><p>这个菜系暂时没有餐厅，换一个试试吧～</p></div>
+      <div id="restaurantWheelArea" class="wheel-card compact">
+        <div class="wheel-wrap"><div class="pointer">▼</div><div id="restaurantWheel" class="wheel"></div><button id="spinRestaurant" class="wheel-center"><span>转</span><small>餐厅</small></button></div>
+        <button id="spinRestaurantBtn" class="primary-btn">看看去哪家 <span>✦</span></button>
+      </div>
+    </section>
+
+    <section id="historyPage" class="page">
+      <div class="section-heading"><span class="eyebrow">MY LITTLE FOOD DIARY</span><h2>今天的选择</h2><p>每一次转动，都悄悄留在这台设备里。</p></div>
+      <div id="todayChoice" class="today-choice"></div>
+      <div class="history-card"><div class="card-title-row"><h3>最近抽到</h3><button id="clearHistory" class="text-btn">清空记录</button></div><div id="historyList" class="history-list"></div></div>
+    </section>
+
+    <section id="adminPage" class="page">
+      <div id="loginView" class="login-card">
+        <div class="login-art">🔐</div><span class="eyebrow">ONLY FOR KUNKUN</span><h2>管理员登录</h2><p>登录后就能打理你的美食小世界啦。</p>
+        <form id="loginForm"><label>账号<input id="username" autocomplete="username" required></label><label>密码<input id="password" type="password" autocomplete="current-password" required></label><button class="primary-btn" type="submit">进入管理小屋</button><p id="loginError" class="form-error"></p></form>
+      </div>
+      <div id="dashboardView" class="dashboard hidden">
+        <div class="dashboard-head"><div><span class="eyebrow">KUNKUN'S PANTRY</span><h2>美食管理小屋</h2></div><button id="logoutBtn" class="secondary-btn">退出登录</button></div>
+        <div class="progress-grid"><div class="stat-card"><span>今日新增</span><strong id="todayProgress">0 / 3</strong><div class="progress"><i id="todayBar"></i></div></div><div class="stat-card"><span>连续完成</span><strong id="streak">0 天</strong><small>每天录入3家就算完成</small></div><div class="stat-card"><span>20天计划</span><strong id="daysProgress">0 / 20</strong><div class="progress"><i id="daysBar"></i></div></div></div>
+        <div class="admin-tabs"><button class="tab active" data-tab="restaurants">餐厅管理</button><button class="tab" data-tab="cuisines">菜系管理</button></div>
+        <div id="restaurantsTab" class="admin-panel">
+          <div class="panel-head"><div><h3>餐厅口袋</h3><p>每天放进三家，慢慢攒成你的专属地图。</p></div><button id="addRestaurantBtn" class="primary-btn small">＋ 添加餐厅</button></div>
+          <div class="filter-row"><select id="restaurantFilter"><option value="">全部菜系</option></select><span id="restaurantCount"></span></div><div id="restaurantAdminList" class="admin-list"></div>
+        </div>
+        <div id="cuisinesTab" class="admin-panel hidden">
+          <div class="panel-head"><div><h3>菜系花园</h3><p>调整顺序、出现机会，或暂时让它休息。</p></div><button id="addCuisineBtn" class="primary-btn small">＋ 添加菜系</button></div><div id="cuisineAdminList" class="admin-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="resultDialog" class="modal result-modal"><button class="modal-close" data-close="resultDialog">×</button><div class="confetti">♥　✦　♡　✿　♥</div><span class="eyebrow">LUCKY PICK</span><h2 id="resultTitle"></h2><p id="resultSubtitle"></p><div id="resultDetails" class="result-details"></div><div class="modal-actions"><button id="spinAgain" class="secondary-btn">再转一次</button><button id="confirmChoice" class="primary-btn">今天就吃它</button></div></dialog>
+  <dialog id="editDialog" class="modal edit-modal"><button class="modal-close" data-close="editDialog">×</button><h2 id="editTitle">添加餐厅</h2><form id="editForm"><input id="editId" type="hidden"><div id="restaurantFields"><label>餐厅名称<input id="restaurantName" maxlength="40"></label><label>所属菜系<select id="restaurantCuisine"></select></label><label>地址（选填）<input id="restaurantAddress" maxlength="120" placeholder="例如：市南区香港中路88号"></label><label>备注（选填）<textarea id="restaurantNote" maxlength="300" placeholder="招牌菜、预约提醒、停车信息……"></textarea></label></div><div id="cuisineFields" class="hidden"><label>菜系名称<input id="cuisineName" maxlength="20"></label><label>出现机会（1～10）<input id="cuisineWeight" type="number" min="1" max="10" value="1"></label></div><p id="editError" class="form-error"></p><button class="primary-btn" type="submit">保存好啦</button></form></dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

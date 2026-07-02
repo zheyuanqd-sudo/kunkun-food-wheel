@@ -1,0 +1,66 @@
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+let state = { cuisines: [], restaurants: [] };
+let admin = false, currentResult = null, spinType = '', rotation = { cuisine: 0, restaurant: 0 }, editType = 'restaurant';
+const colors = ['#ffd3df','#f7a9c0','#ffe7c9','#f5c3d2','#ffc2c9','#f8d7b9','#edb0cd','#ffdce4','#f3c0a9','#f9b7ca','#f7d7df','#efb3bf','#ffddc2','#f4a2b9','#f8cad8','#efc0d0'];
+
+async function request(url, options={}) { const res=await fetch(url,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.error||'网络开小差了'); return data; }
+async function loadState(){ try{state=await request('/api/state');renderAll();}catch(e){toast(e.message);} }
+const activeCuisines=()=>state.cuisines.filter(c=>c.enabled).sort((a,b)=>a.order-b.order);
+function weightedItems(items){return items.flatMap(item=>Array(Math.max(1,item.weight||1)).fill(item));}
+function makeWheel(el,items,labelKey='name'){
+  if(!items.length){el.style.background='#f9e4ea';el.innerHTML='';return;}
+  const step=360/items.length; el.style.background=`conic-gradient(${items.map((_,i)=>`${colors[i%colors.length]} ${i*step}deg ${(i+1)*step}deg`).join(',')})`;
+  el.innerHTML=items.map((item,i)=>`<span class="wheel-label" style="transform:rotate(${i*step+step/2}deg) translateY(-50%)"><span style="transform:rotate(90deg)">${escapeHtml(item[labelKey])}</span></span>`).join('');
+}
+function escapeHtml(v=''){const d=document.createElement('div');d.textContent=v;return d.innerHTML;}
+function renderAll(){
+  const cuisines=activeCuisines(); makeWheel($('#cuisineWheel'),cuisines);
+  const opts=cuisines.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const previous=$('#cuisineSelect').value; $('#cuisineSelect').innerHTML=opts; if(cuisines.some(c=>c.id===previous))$('#cuisineSelect').value=previous;
+  $('#restaurantCuisine').innerHTML=state.cuisines.slice().sort((a,b)=>a.order-b.order).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  $('#restaurantFilter').innerHTML='<option value="">全部菜系</option>'+state.cuisines.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  renderRestaurantWheel(); renderHistory(); if(admin){renderAdmin();loadProgress();}
+}
+function renderRestaurantWheel(){const id=$('#cuisineSelect').value;const items=state.restaurants.filter(r=>r.cuisineId===id);$('#restaurantEmpty').classList.toggle('hidden',items.length>0);$('#restaurantWheelArea').classList.toggle('hidden',!items.length);makeWheel($('#restaurantWheel'),items);}
+function spin(kind){
+  const isCuisine=kind==='cuisine';const baseItems=isCuisine?activeCuisines():state.restaurants.filter(r=>r.cuisineId===$('#cuisineSelect').value);if(!baseItems.length){toast(isCuisine?'还没有可用菜系':'这个菜系还没有餐厅哦');return;}
+  const pick=isCuisine?weightedItems(baseItems)[Math.floor(Math.random()*weightedItems(baseItems).length)]:baseItems[Math.floor(Math.random()*baseItems.length)];
+  const index=baseItems.findIndex(x=>x.id===pick.id), step=360/baseItems.length, extra=360*6, target=extra+(360-(index*step+step/2)); rotation[kind]+=target;
+  const wheel=$(isCuisine?'#cuisineWheel':'#restaurantWheel');wheel.classList.add('spinning');wheel.style.transform=`rotate(${rotation[kind]}deg)`;
+  setTimeout(()=>{wheel.classList.remove('spinning');currentResult=pick;spinType=kind;recordSpin(pick,kind);showResult(pick,kind);},4300);
+}
+function showResult(item,kind){const cuisine=kind==='cuisine'?item:state.cuisines.find(c=>c.id===item.cuisineId);$('#resultTitle').textContent=kind==='cuisine'?item.name:item.name;$('#resultSubtitle').textContent=kind==='cuisine'?'今天就向这个味道出发吧！':`${cuisine?.name||''} · 被幸运选中的这一家`;$('#resultDetails').innerHTML=kind==='restaurant'?`<p>📍 ${escapeHtml(item.address||'还没有填写地址')}</p><p>💌 ${escapeHtml(item.note||'还没有留下备注')}</p>`:'<p style="text-align:center">接下来，可以去餐厅转盘挑一家啦～</p>';$('#confirmChoice').textContent=kind==='cuisine'?'去抽餐厅':'今天就吃它';$('#resultDialog').showModal();}
+function recordSpin(item,kind){const history=JSON.parse(localStorage.getItem('kunkun_history')||'[]');const cuisine=kind==='cuisine'?item:state.cuisines.find(c=>c.id===item.cuisineId);history.unshift({id:crypto.randomUUID(),kind,name:item.name,cuisine:cuisine?.name,time:new Date().toISOString()});localStorage.setItem('kunkun_history',JSON.stringify(history.slice(0,30)));renderHistory();}
+function confirmChoice(){if(spinType==='cuisine'){const c=currentResult;$('#resultDialog').close();showPage('restaurant');$('#cuisineSelect').value=c.id;renderRestaurantWheel();return;}localStorage.setItem('kunkun_today',JSON.stringify({...currentResult,date:new Date().toISOString().slice(0,10),confirmedAt:new Date().toISOString(),cuisine:state.cuisines.find(c=>c.id===currentResult.cuisineId)?.name}));$('#resultDialog').close();toast('好耶，今天就吃这家啦！');renderHistory();}
+function renderHistory(){const today=JSON.parse(localStorage.getItem('kunkun_today')||'null'), history=JSON.parse(localStorage.getItem('kunkun_history')||'[]');const valid=today?.date===new Date().toISOString().slice(0,10);$('#todayChoice').classList.toggle('empty',!valid);$('#todayChoice').innerHTML=valid?`<span class="choice-tag">今天就吃它</span><h3>${escapeHtml(today.name)}</h3><p>${escapeHtml(today.cuisine||'')} · ${escapeHtml(today.address||'地址待补充')}</p>${today.note?`<p>💌 ${escapeHtml(today.note)}</p>`:''}`:'<div style="font-size:38px">🍽️</div><p>今天还没有敲定餐厅，去转一下吧～</p>';$('#historyList').innerHTML=history.length?history.map(h=>`<div class="history-item"><div><strong>${escapeHtml(h.name)}</strong><p>${h.kind==='cuisine'?'抽到菜系':escapeHtml(h.cuisine||'餐厅')}</p></div><span class="history-time">${new Date(h.time).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div>`).join(''):'<p style="text-align:center;color:var(--muted)">转盘还没留下足迹～</p>';}
+function showPage(name){document.body.dataset.page=name;$$('.page').forEach(p=>p.classList.remove('active'));$(`#${name}Page`).classList.add('active');$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===name));window.scrollTo({top:0,behavior:'smooth'});if(name==='admin')checkSession();}
+async function checkSession(){try{admin=(await request('/api/session')).admin;}catch{admin=false;}$('#loginView').classList.toggle('hidden',admin);$('#dashboardView').classList.toggle('hidden',!admin);$('#adminEntry').textContent=admin?'管理小屋':'管理入口';if(admin){renderAdmin();loadProgress();}}
+async function loadProgress(){try{const p=await request('/api/admin/progress');$('#todayProgress').textContent=`${p.todayCount} / 3`;$('#todayBar').style.width=`${Math.min(100,p.todayCount/3*100)}%`;$('#streak').textContent=`${p.streak} 天`;$('#daysProgress').textContent=`${p.completedDays} / 20`;$('#daysBar').style.width=`${Math.min(100,p.completedDays/20*100)}%`;}catch(e){if(e.message.includes('登录'))checkSession();}}
+function renderAdmin(){
+  const filter=$('#restaurantFilter').value;const restaurants=state.restaurants.filter(r=>!filter||r.cuisineId===filter);$('#restaurantCount').textContent=`共 ${restaurants.length} 家`;
+  $('#restaurantAdminList').innerHTML=restaurants.length?restaurants.map(r=>{const c=state.cuisines.find(x=>x.id===r.cuisineId);return `<div class="admin-item"><div class="admin-item-main"><span class="item-icon">🍽️</span><div><h4>${escapeHtml(r.name)}</h4><p>${escapeHtml(c?.name||'未分类')} · ${escapeHtml(r.address||'未填写地址')}</p></div></div><div class="item-actions"><button class="icon-btn" data-edit-restaurant="${r.id}">编辑</button><button class="icon-btn danger" data-delete-restaurant="${r.id}">删除</button></div></div>`}).join(''):'<div class="empty-state"><div class="empty-icon">🥡</div><p>餐厅口袋还是空的，添加第一家吧～</p></div>';
+  const ordered=state.cuisines.slice().sort((a,b)=>a.order-b.order);$('#cuisineAdminList').innerHTML=ordered.map((c,i)=>`<div class="admin-item ${c.enabled?'':'disabled-item'}"><div class="admin-item-main"><span class="item-icon">${c.enabled?'🌸':'💤'}</span><div><h4>${escapeHtml(c.name)}</h4><p>顺序 ${i+1} · 出现机会 ${c.weight} · ${state.restaurants.filter(r=>r.cuisineId===c.id).length} 家餐厅</p></div></div><div class="item-actions"><button class="icon-btn" data-move-cuisine="${c.id}" data-direction="up" ${i===0?'disabled':''}>↑</button><button class="icon-btn" data-move-cuisine="${c.id}" data-direction="down" ${i===ordered.length-1?'disabled':''}>↓</button><button class="toggle ${c.enabled?'':'off'}" data-toggle-cuisine="${c.id}">${c.enabled?'已启用':'已停用'}</button><button class="icon-btn" data-edit-cuisine="${c.id}">编辑</button><button class="icon-btn danger" data-delete-cuisine="${c.id}">删除</button></div></div>`).join('');
+}
+function openEdit(type,id=''){editType=type;$('#editId').value=id;$('#restaurantFields').classList.toggle('hidden',type!=='restaurant');$('#cuisineFields').classList.toggle('hidden',type!=='cuisine');$('#editError').textContent='';if(type==='restaurant'){const r=state.restaurants.find(x=>x.id===id);$('#editTitle').textContent=r?'编辑餐厅':'添加餐厅';$('#restaurantName').value=r?.name||'';$('#restaurantCuisine').value=r?.cuisineId||activeCuisines()[0]?.id||'';$('#restaurantAddress').value=r?.address||'';$('#restaurantNote').value=r?.note||'';}else{const c=state.cuisines.find(x=>x.id===id);$('#editTitle').textContent=c?'编辑菜系':'添加菜系';$('#cuisineName').value=c?.name||'';$('#cuisineWeight').value=c?.weight||1;}$('#editDialog').showModal();}
+async function saveEdit(e){e.preventDefault();const id=$('#editId').value;try{if(editType==='restaurant'){const payload={name:$('#restaurantName').value,cuisineId:$('#restaurantCuisine').value,address:$('#restaurantAddress').value,note:$('#restaurantNote').value};await request(id?`/api/restaurants/${id}`:'/api/restaurants',{method:id?'PUT':'POST',body:JSON.stringify(payload)});}else{const old=state.cuisines.find(c=>c.id===id);const payload={name:$('#cuisineName').value,weight:Number($('#cuisineWeight').value),enabled:old?.enabled??true,order:old?.order??state.cuisines.length};await request(id?`/api/cuisines/${id}`:'/api/cuisines',{method:id?'PUT':'POST',body:JSON.stringify(payload)});}$('#editDialog').close();toast('已经好好保存啦');await loadState();}catch(err){$('#editError').textContent=err.message;}}
+async function mutate(url,method='DELETE',body){try{await request(url,{method,body:body?JSON.stringify(body):undefined});toast('操作完成啦');await loadState();}catch(e){toast(e.message);}}
+async function moveCuisine(id,direction){const ordered=state.cuisines.slice().sort((a,b)=>a.order-b.order),from=ordered.findIndex(c=>c.id===id),to=direction==='up'?from-1:from+1;if(from<0||to<0||to>=ordered.length)return;[ordered[from],ordered[to]]=[ordered[to],ordered[from]];await mutate('/api/cuisines/reorder','PUT',{ids:ordered.map(c=>c.id)});}
+function toast(text){const el=$('#toast');el.textContent=text;el.classList.add('show');clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove('show'),2600);}
+
+document.addEventListener('click',async e=>{
+  const page=e.target.closest('[data-page]')?.dataset.page;if(page)showPage(page);
+  const close=e.target.dataset.close;if(close)$(`#${close}`).close();
+  const rid=e.target.dataset.editRestaurant;if(rid)openEdit('restaurant',rid);const cid=e.target.dataset.editCuisine;if(cid)openEdit('cuisine',cid);
+  const dr=e.target.dataset.deleteRestaurant;if(dr&&confirm('确定删除这家餐厅吗？'))mutate(`/api/restaurants/${dr}`);
+  const dc=e.target.dataset.deleteCuisine;if(dc&&confirm('确定删除这个菜系吗？'))mutate(`/api/cuisines/${dc}`);
+  const tc=e.target.dataset.toggleCuisine;if(tc){const c=state.cuisines.find(x=>x.id===tc);mutate(`/api/cuisines/${tc}`,'PUT',{...c,enabled:!c.enabled});}
+  const mc=e.target.dataset.moveCuisine;if(mc)moveCuisine(mc,e.target.dataset.direction);
+});
+$('#spinCuisine').onclick=$('#spinCuisineBtn').onclick=()=>spin('cuisine');$('#spinRestaurant').onclick=$('#spinRestaurantBtn').onclick=()=>spin('restaurant');$('#cuisineSelect').onchange=renderRestaurantWheel;$('#spinAgain').onclick=()=>{$('#resultDialog').close();spin(spinType)};$('#confirmChoice').onclick=confirmChoice;
+$('#clearHistory').onclick=()=>{localStorage.removeItem('kunkun_history');renderHistory();toast('记录已经清空啦')};
+$('#loginForm').onsubmit=async e=>{e.preventDefault();try{await request('/api/login',{method:'POST',body:JSON.stringify({username:$('#username').value,password:$('#password').value})});$('#password').value='';await checkSession();toast('欢迎回来，坤坤～');}catch(err){$('#loginError').textContent=err.message;}};
+$('#logoutBtn').onclick=async()=>{await request('/api/logout',{method:'POST'});admin=false;checkSession();toast('已经安全退出啦')};
+$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===t));$('#restaurantsTab').classList.toggle('hidden',t.dataset.tab!=='restaurants');$('#cuisinesTab').classList.toggle('hidden',t.dataset.tab!=='cuisines')});
+$('#addRestaurantBtn').onclick=()=>openEdit('restaurant');$('#addCuisineBtn').onclick=()=>openEdit('cuisine');$('#editForm').onsubmit=saveEdit;$('#restaurantFilter').onchange=renderAdmin;
+document.body.dataset.page='home';loadState();
