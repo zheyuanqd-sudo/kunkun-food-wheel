@@ -3,6 +3,9 @@ import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { createHmac, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
+import pg from 'pg';
+
+const { Pool } = pg;
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -11,6 +14,7 @@ const PUBLIC_DIR = join(process.cwd(), 'public');
 const ADMIN_USER = process.env.ADMIN_USER || 'kunkunele';
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '00a821a164d68268545bf0d7751a208d:786a1c96f67f6449c973326ee4c2352861881390bf4c79bcac0b777ab7a855c0d3c90ebf14f570bad50f19fdc63ee77ad3730348c5a6ae7819b552771d0db801';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'development-only-change-me-kunkun';
+const DATABASE_URL = process.env.DATABASE_URL || '';
 const isProduction = process.env.NODE_ENV === 'production';
 
 const initialCuisines = ['粤菜','北京菜','湘菜','川菜','东北菜','江浙菜','云南菜','日料','烤肉','烧烤','青岛菜','韩料','东南亚','火锅','包子生煎','海鲜'];
@@ -24,9 +28,21 @@ const initialData = () => ({
 
 let store;
 let writeQueue = Promise.resolve();
+let pool;
 const loginAttempts = new Map();
 
 async function loadStore() {
+  if (DATABASE_URL) {
+    pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3 });
+    await pool.query('create table if not exists app_state (id bigint primary key check (id = 1), data jsonb not null, updated_at timestamptz not null default now())');
+    const result = await pool.query('select data from app_state where id = 1');
+    if (result.rows[0]?.data) store = { ...initialData(), ...result.rows[0].data };
+    else {
+      store = initialData();
+      await pool.query('insert into app_state (id, data) values (1, $1::jsonb)', [JSON.stringify(store)]);
+    }
+    return;
+  }
   await mkdir(join(DATA_FILE, '..'), { recursive: true });
   if (!existsSync(DATA_FILE)) {
     store = initialData();
@@ -45,6 +61,10 @@ async function loadStore() {
 function saveStore() {
   store.updatedAt = now();
   writeQueue = writeQueue.then(async () => {
+    if (pool) {
+      await pool.query('insert into app_state (id, data, updated_at) values (1, $1::jsonb, now()) on conflict (id) do update set data = excluded.data, updated_at = now()', [JSON.stringify(store)]);
+      return;
+    }
     const tmp = `${DATA_FILE}.tmp`;
     await writeFile(tmp, JSON.stringify(store, null, 2));
     await rename(tmp, DATA_FILE);

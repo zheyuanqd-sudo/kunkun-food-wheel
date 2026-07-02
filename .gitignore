@@ -2,3 +2,7 @@ data/store.json
 .DS_Store
 .env
 .tools/
+node_modules/
+.pnpm-store/
+work/
+outputs/
