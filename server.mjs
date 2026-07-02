@@ -22,6 +22,8 @@ const now = () => new Date().toISOString();
 const initialData = () => ({
   cuisines: initialCuisines.map((name, index) => ({ id: `c-${index + 1}`, name, enabled: true, weight: 1, order: index })),
   restaurants: [],
+  fitnessMeals: [],
+  nightSnacks: [],
   createdAt: now(),
   updatedAt: now()
 });
@@ -98,13 +100,15 @@ function isAdmin(req) {
 
 async function body(req) {
   const chunks = []; let size = 0;
-  for await (const chunk of req) { size += chunk.length; if (size > 100000) throw new Error('请求内容过大'); chunks.push(chunk); }
+  for await (const chunk of req) { size += chunk.length; if (size > 2500000) throw new Error('图片或内容过大，请换一张更小的图片'); chunks.push(chunk); }
   try { return JSON.parse(Buffer.concat(chunks).toString() || '{}'); } catch { throw new Error('内容格式不正确'); }
 }
 const clean = (value, max = 120) => String(value || '').trim().slice(0, max);
 const publicState = () => ({
   cuisines: store.cuisines.slice().sort((a,b) => a.order - b.order),
   restaurants: store.restaurants.slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
+  fitnessMeals: (store.fitnessMeals || []).slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
+  nightSnacks: (store.nightSnacks || []).slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
   updatedAt: store.updatedAt
 });
 
@@ -174,6 +178,30 @@ async function api(req, res, url) {
     const item=store.restaurants.find(r=>r.id===restaurantMatch[1]); if(!item)return json(res,404,{error:'餐厅不存在'});
     if(req.method==='PUT'){const data=await body(req);const name=clean(data.name,40),cuisineId=clean(data.cuisineId,80);if(!name||!store.cuisines.some(c=>c.id===cuisineId))return json(res,400,{error:'请填写餐厅名称并选择菜系'});if(store.restaurants.some(r=>r.id!==item.id&&r.name===name&&r.cuisineId===cuisineId))return json(res,409,{error:'这个菜系下已有同名餐厅'});Object.assign(item,{name,cuisineId,address:clean(data.address,120),note:clean(data.note,300)});await saveStore();return json(res,200,item);}
     if(req.method==='DELETE'){store.restaurants=store.restaurants.filter(r=>r.id!==item.id);await saveStore();return json(res,200,{ok:true});}
+  }
+  const menuCollectionMatch=url.pathname.match(/^\/api\/(fitness-meals|night-snacks)$/);
+  if(menuCollectionMatch&&req.method==='POST'){
+    const key=menuCollectionMatch[1]==='fitness-meals'?'fitnessMeals':'nightSnacks';
+    const data=await body(req),name=clean(data.name,50),image=clean(data.image,1800000),calories=clean(data.calories,40),ingredients=clean(data.ingredients,500);
+    if(!name)return json(res,400,{error:'请填写名称'});
+    if(!image)return json(res,400,{error:'请上传一张图片'});
+    if(key==='fitnessMeals'&&!ingredients)return json(res,400,{error:'请填写食材'});
+    if(!calories)return json(res,400,{error:'请填写热量'});
+    if((store[key]||[]).some(x=>x.name===name))return json(res,409,{error:'这个名称已经存在啦'});
+    const item={id:randomUUID(),name,image,calories,ingredients:key==='fitnessMeals'?ingredients:'',createdAt:now()};
+    store[key]=store[key]||[];store[key].push(item);await saveStore();return json(res,201,item);
+  }
+  const menuItemMatch=url.pathname.match(/^\/api\/(fitness-meals|night-snacks)\/([^/]+)$/);
+  if(menuItemMatch){
+    const key=menuItemMatch[1]==='fitness-meals'?'fitnessMeals':'nightSnacks',items=store[key]||[],item=items.find(x=>x.id===menuItemMatch[2]);
+    if(!item)return json(res,404,{error:'内容不存在'});
+    if(req.method==='PUT'){
+      const data=await body(req),name=clean(data.name,50),image=clean(data.image,1800000),calories=clean(data.calories,40),ingredients=clean(data.ingredients,500);
+      if(!name||!image||!calories||(key==='fitnessMeals'&&!ingredients))return json(res,400,{error:'请将资料填写完整'});
+      if(items.some(x=>x.id!==item.id&&x.name===name))return json(res,409,{error:'这个名称已经存在啦'});
+      Object.assign(item,{name,image,calories,ingredients:key==='fitnessMeals'?ingredients:''});await saveStore();return json(res,200,item);
+    }
+    if(req.method==='DELETE'){store[key]=items.filter(x=>x.id!==item.id);await saveStore();return json(res,200,{ok:true});}
   }
   return json(res, 404, { error: '没有找到这个功能' });
 }
