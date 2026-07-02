@@ -2,8 +2,9 @@ import http from 'node:http';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
-import { createHmac, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
+import { createHmac, createHash, randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
 import pg from 'pg';
+import { WebSocketServer, WebSocket } from 'ws';
 
 const { Pool } = pg;
 
@@ -18,12 +19,18 @@ const DATABASE_URL = process.env.DATABASE_URL || '';
 const isProduction = process.env.NODE_ENV === 'production';
 
 const initialCuisines = ['粤菜','北京菜','湘菜','川菜','东北菜','江浙菜','云南菜','日料','烤肉','烧烤','青岛菜','韩料','东南亚','火锅','包子生煎','海鲜'];
+const initialBlessings = [
+  '今天的快乐，就从这一口开始吧～','和喜欢的人一起吃，热量可以先不算！','命运已经选好啦，坤坤只负责开心吃～','这顿饭一定会有小惊喜 ✨',
+  '好好吃饭，就是今天最温柔的小事～','幸运转盘说：这一口会超级满足！','吃饱饱，烦恼就会变得小小的～','今日份幸福正在热乎乎地赶来！',
+  '愿这一餐有香气、有笑声，还有好心情～','被选中的美味，当然要认真享受啦！','今天也要和好吃的东西见面呀～','快乐无需理由，美食就是最好的答案 ♡'
+];
 const now = () => new Date().toISOString();
 const initialData = () => ({
   cuisines: initialCuisines.map((name, index) => ({ id: `c-${index + 1}`, name, enabled: true, weight: 1, order: index })),
   restaurants: [],
   fitnessMeals: [],
   nightSnacks: [],
+  blessings: initialBlessings.map((text,index)=>({id:`b-${index+1}`,text,enabled:true,order:index})),
   createdAt: now(),
   updatedAt: now()
 });
@@ -32,11 +39,15 @@ let store;
 let writeQueue = Promise.resolve();
 let pool;
 const loginAttempts = new Map();
+const localRooms = new Map();
+const roomClients = new Map();
+const roomLocks = new Map();
 
 async function loadStore() {
   if (DATABASE_URL) {
     pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3 });
     await pool.query('create table if not exists app_state (id bigint primary key check (id = 1), data jsonb not null, updated_at timestamptz not null default now())');
+    await pool.query('create table if not exists shared_rooms (id text primary key, data jsonb not null, expires_at timestamptz not null, updated_at timestamptz not null default now())');
     const result = await pool.query('select data from app_state where id = 1');
     if (result.rows[0]?.data) store = { ...initialData(), ...result.rows[0].data };
     else {
@@ -109,8 +120,39 @@ const publicState = () => ({
   restaurants: store.restaurants.slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
   fitnessMeals: (store.fitnessMeals || []).slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
   nightSnacks: (store.nightSnacks || []).slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
+  blessings: (store.blessings || []).filter(x=>x.enabled).slice().sort((a,b)=>a.order-b.order),
   updatedAt: store.updatedAt
 });
+
+const hashToken=value=>createHash('sha256').update(value).digest('hex');
+const validRoomId=value=>/^[A-Za-z0-9_-]{20,40}$/.test(value||'');
+const randomToken=bytes=>randomBytes(bytes).toString('base64url');
+const newRoom=id=>({id,participants:[],stage:'cuisine',selectedCuisineId:null,finalRestaurantId:null,spin:null,revision:0,createdAt:now(),expiresAt:new Date(Date.now()+86400000).toISOString()});
+
+async function loadRoom(id){
+  if(!validRoomId(id))return null;
+  let room;
+  if(pool){const result=await pool.query('select data from shared_rooms where id=$1 and expires_at>now()',[id]);room=result.rows[0]?.data||null;}
+  else{room=localRooms.get(id)||null;if(room&&new Date(room.expiresAt)<=new Date()){localRooms.delete(id);room=null;}}
+  return room;
+}
+async function saveRoom(room){
+  room.revision=(room.revision||0)+1;
+  if(pool)await pool.query('insert into shared_rooms(id,data,expires_at,updated_at) values($1,$2::jsonb,$3,now()) on conflict(id) do update set data=excluded.data,expires_at=excluded.expires_at,updated_at=now()',[room.id,JSON.stringify(room),room.expiresAt]);
+  else localRooms.set(room.id,structuredClone(room));
+  return room;
+}
+function onlineParticipantIds(roomId){return new Set([...(roomClients.get(roomId)||[])].filter(ws=>ws.readyState===WebSocket.OPEN).map(ws=>ws.participantId));}
+function publicRoom(room){
+  const online=onlineParticipantIds(room.id);
+  return {...room,participants:room.participants.map(({tokenHash,...p})=>({...p,online:online.has(p.id)})),onlineCount:online.size};
+}
+function withRoomLock(id,task){const previous=roomLocks.get(id)||Promise.resolve();const next=previous.catch(()=>{}).then(task);roomLocks.set(id,next);next.finally(()=>{if(roomLocks.get(id)===next)roomLocks.delete(id);});return next;}
+function roomSend(ws,payload){if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(payload));}
+function broadcastRoom(room){for(const ws of roomClients.get(room.id)||[])roomSend(ws,{type:'state',room:publicRoom(room)});}
+function roomError(ws,message){roomSend(ws,{type:'error',message});}
+function activeBlessings(){return (store.blessings||[]).filter(x=>x.enabled).sort((a,b)=>a.order-b.order);}
+function randomBlessing(){const items=activeBlessings();return items.length?items[Math.floor(Math.random()*items.length)].text:'';}
 
 function progress() {
   const counts = {};
@@ -144,8 +186,33 @@ async function api(req, res, url) {
     return json(res, 200, { ok: true }, { 'Set-Cookie': `kunkun_session=${makeToken()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${isProduction ? '; Secure' : ''}` });
   }
   if (url.pathname === '/api/logout' && req.method === 'POST') return json(res, 200, { ok: true }, { 'Set-Cookie': 'kunkun_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
+  const roomMatch=url.pathname.match(/^\/api\/rooms\/([A-Za-z0-9_-]{20,40})$/);
+  if(roomMatch&&req.method==='GET'){
+    const room=await loadRoom(roomMatch[1]);
+    if(!room)return json(res,410,{error:'这个邀请房间已经失效啦'});
+    return json(res,200,publicRoom(room));
+  }
   if (!sameOrigin(req)) return json(res, 403, { error: '请求来源无效' });
+  if(url.pathname==='/api/rooms'&&req.method==='POST'){
+    const room=newRoom(randomToken(18));await saveRoom(room);return json(res,201,{roomId:room.id,expiresAt:room.expiresAt});
+  }
+  const joinMatch=url.pathname.match(/^\/api\/rooms\/([A-Za-z0-9_-]{20,40})\/join$/);
+  if(joinMatch&&req.method==='POST'){
+    const data=await body(req),nickname=clean(data.nickname,10),provided=clean(data.participantToken,100);
+    if(!nickname)return json(res,400,{error:'给自己起一个小昵称吧～'});
+    return withRoomLock(joinMatch[1],async()=>{
+      let room=await loadRoom(joinMatch[1]);if(!room)room=newRoom(joinMatch[1]);
+      let participant=provided?room.participants.find(p=>p.tokenHash===hashToken(provided)):null,token=provided;
+      if(participant){participant.nickname=nickname;}
+      else{
+        if(room.participants.length>=3)return json(res,409,{error:'三颗小草莓已经到齐啦，这个房间满员了'});
+        token=randomToken(24);participant={id:randomUUID(),nickname,seat:room.participants.length+1,exclusions:[],tokenHash:hashToken(token),joinedAt:now()};room.participants.push(participant);
+      }
+      await saveRoom(room);broadcastRoom(room);return json(res,200,{participantId:participant.id,participantToken:token,room:publicRoom(room)});
+    });
+  }
   if (url.pathname === '/api/admin/progress' && req.method === 'GET') { if (!requireAdmin(req,res)) return; return json(res, 200, progress()); }
+  if (url.pathname === '/api/admin/blessings' && req.method === 'GET') { if (!requireAdmin(req,res)) return; return json(res,200,(store.blessings||[]).slice().sort((a,b)=>a.order-b.order)); }
   if (!requireAdmin(req, res)) return;
 
   if (url.pathname === '/api/cuisines' && req.method === 'POST') {
@@ -203,7 +270,55 @@ async function api(req, res, url) {
     }
     if(req.method==='DELETE'){store[key]=items.filter(x=>x.id!==item.id);await saveStore();return json(res,200,{ok:true});}
   }
+  if(url.pathname==='/api/blessings'&&req.method==='POST'){
+    const data=await body(req),text=clean(data.text,120);if(!text)return json(res,400,{error:'请写一句祝福语'});
+    if((store.blessings||[]).some(x=>x.text===text))return json(res,409,{error:'这句祝福已经存在啦'});
+    const item={id:randomUUID(),text,enabled:true,order:(store.blessings||[]).length};store.blessings=store.blessings||[];store.blessings.push(item);await saveStore();return json(res,201,item);
+  }
+  if(url.pathname==='/api/blessings/reorder'&&req.method==='PUT'){
+    const data=await body(req),ids=Array.isArray(data.ids)?data.ids:[],items=store.blessings||[];
+    if(ids.length!==items.length||new Set(ids).size!==ids.length||ids.some(id=>!items.some(x=>x.id===id)))return json(res,400,{error:'祝福语顺序不完整'});
+    ids.forEach((id,order)=>{items.find(x=>x.id===id).order=order;});await saveStore();return json(res,200,{ok:true});
+  }
+  const blessingMatch=url.pathname.match(/^\/api\/blessings\/([^/]+)$/);
+  if(blessingMatch){
+    const item=(store.blessings||[]).find(x=>x.id===blessingMatch[1]);if(!item)return json(res,404,{error:'祝福语不存在'});
+    if(req.method==='PUT'){const data=await body(req),text=clean(data.text,120);if(!text)return json(res,400,{error:'请写一句祝福语'});if(store.blessings.some(x=>x.id!==item.id&&x.text===text))return json(res,409,{error:'这句祝福已经存在啦'});Object.assign(item,{text,enabled:Boolean(data.enabled),order:Math.max(0,Number(data.order)||0)});await saveStore();return json(res,200,item);}
+    if(req.method==='DELETE'){store.blessings=store.blessings.filter(x=>x.id!==item.id);await saveStore();return json(res,200,{ok:true});}
+  }
   return json(res, 404, { error: '没有找到这个功能' });
+}
+
+async function handleRoomMessage(ws,raw){
+  let message;try{message=JSON.parse(raw.toString());}catch{return roomError(ws,'消息格式不正确');}
+  await withRoomLock(ws.roomId,async()=>{
+    const room=await loadRoom(ws.roomId);if(!room)return roomError(ws,'这个房间已经失效啦');
+    const participant=room.participants.find(p=>p.id===ws.participantId&&p.tokenHash===ws.tokenHash);if(!participant)return roomError(ws,'参与身份已经失效');
+    const spinning=room.spin&&room.spin.endsAt>Date.now();
+    if(message.type==='exclude'){
+      if(room.stage!=='cuisine'||spinning)return roomError(ws,'转盘进行中，暂时不能修改选择');
+      const cuisine=store.cuisines.find(c=>c.id===message.cuisineId&&c.enabled);if(!cuisine)return roomError(ws,'这个菜系不可用');
+      const set=new Set(participant.exclusions||[]);message.excluded?set.add(cuisine.id):set.delete(cuisine.id);participant.exclusions=[...set];room.spin=null;
+    }else if(message.type==='spin'){
+      if(spinning)return roomError(ws,'转盘已经开始啦，看看这次会抽到什么～');
+      if(message.kind==='cuisine'){
+        if(room.stage!=='cuisine')return roomError(ws,'先重新选择菜系再转哦');
+        const excluded=new Set(room.participants.flatMap(p=>p.exclusions||[]));const choices=store.cuisines.filter(c=>c.enabled&&!excluded.has(c.id)).sort((a,b)=>a.order-b.order);
+        if(!choices.length)return roomError(ws,'总得留点能吃的呀～');
+        const weighted=choices.flatMap(item=>Array(Math.max(1,item.weight||1)).fill(item)),pick=weighted[Math.floor(Math.random()*weighted.length)];
+        room.selectedCuisineId=pick.id;room.finalRestaurantId=null;room.stage='restaurant';room.spin={id:randomUUID(),kind:'cuisine',resultId:pick.id,blessing:randomBlessing(),startedAt:Date.now()+600,endsAt:Date.now()+4900};
+      }else if(message.kind==='restaurant'){
+        if(!room.selectedCuisineId)return roomError(ws,'请先抽出一个共同菜系');
+        const choices=store.restaurants.filter(r=>r.cuisineId===room.selectedCuisineId);if(!choices.length)return roomError(ws,'这个菜系还没有餐厅，重新抽一个菜系吧～');
+        const pick=choices[Math.floor(Math.random()*choices.length)];room.finalRestaurantId=pick.id;room.stage='done';room.spin={id:randomUUID(),kind:'restaurant',resultId:pick.id,blessing:randomBlessing(),startedAt:Date.now()+600,endsAt:Date.now()+4900};
+      }else return roomError(ws,'未知的转盘类型');
+    }else if(message.type==='resetCuisine'){
+      if(spinning)return roomError(ws,'等转盘停下来再重新选择吧～');room.stage='cuisine';room.selectedCuisineId=null;room.finalRestaurantId=null;room.spin=null;
+    }else if(message.type==='resetRestaurant'){
+      if(spinning)return roomError(ws,'等转盘停下来再重抽吧～');if(!room.selectedCuisineId)return roomError(ws,'请先抽菜系');room.stage='restaurant';room.finalRestaurantId=null;room.spin=null;
+    }else return roomError(ws,'没有找到这个房间操作');
+    await saveRoom(room);broadcastRoom(room);
+  }).catch(err=>{console.error(err);roomError(ws,'房间暂时开小差了，请稍后重试');});
 }
 
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'};
@@ -217,5 +332,21 @@ async function serve(req,res,url){
 
 await loadStore();
 const server=http.createServer((req,res)=>{const url=new URL(req.url,`http://${req.headers.host||'localhost'}`);serve(req,res,url).catch(err=>{console.error(err);if(!res.headersSent)json(res,500,{error:'服务暂时开小差了，请稍后再试'});else res.end();});});
+const wss=new WebSocketServer({noServer:true});
+server.on('upgrade',async(req,socket,head)=>{
+  try{
+    const url=new URL(req.url,`http://${req.headers.host||'localhost'}`);if(url.pathname!=='/ws')return socket.destroy();
+    const roomId=url.searchParams.get('room'),token=url.searchParams.get('token');if(!validRoomId(roomId)||!token)return socket.destroy();
+    const room=await loadRoom(roomId),tokenHash=hashToken(token),participant=room?.participants.find(p=>p.tokenHash===tokenHash);if(!room||!participant)return socket.destroy();
+    wss.handleUpgrade(req,socket,head,ws=>{ws.roomId=roomId;ws.participantId=participant.id;ws.tokenHash=tokenHash;ws.isAlive=true;wss.emit('connection',ws,req);});
+  }catch{socket.destroy();}
+});
+wss.on('connection',async ws=>{
+  if(!roomClients.has(ws.roomId))roomClients.set(ws.roomId,new Set());roomClients.get(ws.roomId).add(ws);
+  ws.on('pong',()=>{ws.isAlive=true;});ws.on('message',data=>handleRoomMessage(ws,data));ws.on('error',()=>{});
+  ws.on('close',async()=>{roomClients.get(ws.roomId)?.delete(ws);if(!roomClients.get(ws.roomId)?.size)roomClients.delete(ws.roomId);const room=await loadRoom(ws.roomId);if(room)broadcastRoom(room);});
+  const room=await loadRoom(ws.roomId);if(room)broadcastRoom(room);
+});
+const heartbeat=setInterval(()=>{for(const ws of wss.clients){if(ws.isAlive===false){ws.terminate();continue;}ws.isAlive=false;ws.ping();}},25000);heartbeat.unref();
 server.listen(PORT,HOST,()=>console.log(`坤坤今天吃什么～ http://${HOST}:${PORT}`));
 export { server, initialCuisines };

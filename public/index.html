@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#fff1f5">
+  <meta property="og:title" content="坤坤邀请你一起吃～">
+  <meta property="og:description" content="一起排除不想吃的，转出今天的共同美味吧！">
   <title>坤坤今天吃什么～</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -21,6 +23,7 @@
   <main>
     <section id="homePage" class="page active">
       <div class="hero-copy"><span class="eyebrow">TODAY'S LITTLE CHOICE</span><h1>坤坤今天吃什么～</h1><p>选择困难先放一放，让幸运转盘替你做决定吧！</p></div>
+      <div class="together-invite"><div><span class="invite-strawberries">🍓🍓🍓</span><strong>最多三个人一起决定</strong><p>分享给朋友，一起排除不想吃的，再同步转盘～</p></div><button id="createRoomBtn" class="primary-btn">坤坤想跟谁吃</button></div>
       <div class="preference-card">
         <div class="preference-head"><div><strong>今天不想吃什么？</strong><p>点一下临时排除，再点一下就恢复。</p></div><button id="resetExclusions" class="text-btn">全部恢复</button></div>
         <div id="exclusionChips" class="chip-list"></div>
@@ -67,22 +70,47 @@
       <div id="todayChoice" class="today-choice"></div><div class="history-card"><div class="card-title-row"><h3>最近抽到</h3><button id="clearHistory" class="text-btn">清空记录</button></div><div id="historyList" class="history-list"></div></div>
     </section>
 
+    <section id="roomPage" class="page">
+      <div class="section-heading"><span class="eyebrow">EAT TOGETHER</span><h2>坤坤邀请你一起吃～</h2><p>三颗小草莓，一起选出大家都喜欢的味道。</p></div>
+      <div class="room-top-card"><div id="roomPresence" class="room-presence"><strong>🍓</strong><span>1 人在线</span></div><button id="shareRoomBtn" class="secondary-btn">再邀请一位</button></div>
+      <div id="roomJoinView" class="login-card room-join-card">
+        <div class="login-art">🍓</div><h2>加入今天的饭局</h2><p>输入一个昵称，让大家知道是谁排除了什么。</p>
+        <form id="roomJoinForm"><label>我的昵称<input id="roomNickname" maxlength="10" autocomplete="nickname" placeholder="例如：坤坤" required></label><button class="primary-btn" type="submit">加入一起选</button><p id="roomJoinError" class="form-error"></p></form>
+      </div>
+      <div id="roomView" class="room-view hidden">
+        <div id="roomMembers" class="room-members"></div>
+        <div id="roomCuisineStage" class="room-stage">
+          <div class="room-stage-head"><div><span class="eyebrow">STEP 1</span><h3>一起排除不想吃的</h3></div><span id="roomCuisineHint">点一下菜系就能排除</span></div>
+          <div id="roomExclusionChips" class="chip-list room-chip-list"></div>
+          <div class="wheel-card compact room-wheel-card"><div class="wheel-wrap"><div class="pointer">▼</div><div id="roomCuisineWheel" class="wheel"></div><button id="roomSpinCuisine" class="wheel-center"><span>转</span><small>共同菜系</small></button></div><button id="roomSpinCuisineBtn" class="primary-btn">抽共同菜系 <span>🍓</span></button></div>
+        </div>
+        <div id="roomRestaurantStage" class="room-stage hidden">
+          <div class="room-stage-head"><div><span class="eyebrow">STEP 2</span><h3>共同菜系：<b id="roomCuisineName"></b></h3></div><button id="roomResetCuisine" class="text-btn">重新选菜系</button></div>
+          <div id="roomRestaurantEmpty" class="empty-state hidden"><div class="empty-icon">🥣</div><h3>这个菜系还没有餐厅</h3><p>返回重新抽一个共同菜系吧～</p></div>
+          <div id="roomRestaurantWheelArea" class="wheel-card compact room-wheel-card"><div class="wheel-wrap"><div class="pointer">▼</div><div id="roomRestaurantWheel" class="wheel"></div><button id="roomSpinRestaurant" class="wheel-center"><span>转</span><small>共同餐厅</small></button></div><button id="roomSpinRestaurantBtn" class="primary-btn">抽共同餐厅 <span>🍽️</span></button><button id="roomResetRestaurant" class="text-btn room-reset-btn">再抽一家</button></div>
+        </div>
+        <p id="roomNotice" class="room-notice">正在连接大家的小草莓信号…</p>
+      </div>
+    </section>
+
     <section id="adminPage" class="page">
       <div id="loginView" class="login-card"><div class="login-art">🔐</div><span class="eyebrow">ONLY FOR KUNKUN</span><h2>管理员登录</h2><p>登录后就能打理你的美食小世界啦。</p><form id="loginForm"><label>账号<input id="username" autocomplete="username" required></label><label>密码<input id="password" type="password" autocomplete="current-password" required></label><button class="primary-btn" type="submit">进入管理小屋</button><p id="loginError" class="form-error"></p></form></div>
       <div id="dashboardView" class="dashboard hidden">
         <div class="dashboard-head"><div><span class="eyebrow">KUNKUN'S PANTRY</span><h2>美食管理小屋</h2></div><button id="logoutBtn" class="secondary-btn">退出登录</button></div>
         <div class="progress-grid"><div class="stat-card"><span>今日新增</span><strong id="todayProgress">0 / 3</strong><div class="progress"><i id="todayBar"></i></div></div><div class="stat-card"><span>连续完成</span><strong id="streak">0 天</strong><small>每天录入3家就算完成</small></div><div class="stat-card"><span>20天计划</span><strong id="daysProgress">0 / 20</strong><div class="progress"><i id="daysBar"></i></div></div></div>
-        <div class="admin-tabs"><button class="tab active" data-tab="restaurants">餐厅管理</button><button class="tab" data-tab="cuisines">菜系管理</button><button class="tab" data-tab="fitness">减脂餐</button><button class="tab" data-tab="night">夜宵</button></div>
+        <div class="admin-tabs"><button class="tab active" data-tab="restaurants">餐厅管理</button><button class="tab" data-tab="cuisines">菜系管理</button><button class="tab" data-tab="fitness">减脂餐</button><button class="tab" data-tab="night">夜宵</button><button class="tab" data-tab="blessings">祝福语</button></div>
         <div id="restaurantsTab" class="admin-panel"><div class="panel-head"><div><h3>餐厅口袋</h3><p>每天放进三家，慢慢攒成你的专属地图。</p></div><button id="addRestaurantBtn" class="primary-btn small">＋ 添加餐厅</button></div><div class="filter-row"><select id="restaurantFilter"><option value="">全部菜系</option></select><span id="restaurantCount"></span></div><div id="restaurantAdminList" class="admin-list"></div></div>
         <div id="cuisinesTab" class="admin-panel hidden"><div class="panel-head"><div><h3>菜系花园</h3><p>调整顺序、出现机会，或暂时让它休息。</p></div><button id="addCuisineBtn" class="primary-btn small">＋ 添加菜系</button></div><div id="cuisineAdminList" class="admin-list"></div></div>
         <div id="fitnessTab" class="admin-panel hidden"><div class="panel-head"><div><h3>减脂菜单</h3><p>添加图片、名称、食材与热量。</p></div><button id="addFitnessBtn" class="primary-btn small">＋ 添加减脂餐</button></div><div id="fitnessAdminList" class="admin-list media-admin-list"></div></div>
         <div id="nightTab" class="admin-panel hidden"><div class="panel-head"><div><h3>夜宵小柜</h3><p>添加图片、名称与热量。</p></div><button id="addNightBtn" class="primary-btn small">＋ 添加夜宵</button></div><div id="nightAdminList" class="admin-list media-admin-list"></div></div>
+        <div id="blessingsTab" class="admin-panel hidden"><div class="panel-head"><div><h3>可爱祝福语</h3><p>每次抽中后，随机送上一句好心情。</p></div><button id="addBlessingBtn" class="primary-btn small">＋ 添加祝福</button></div><div id="blessingAdminList" class="admin-list"></div></div>
       </div>
     </section>
   </main>
 
-  <dialog id="resultDialog" class="modal result-modal"><button class="modal-close" data-close="resultDialog">×</button><div class="confetti">♥　✦　♡　✿　♥</div><span class="eyebrow">LUCKY PICK</span><h2 id="resultTitle"></h2><p id="resultSubtitle"></p><div id="resultDetails" class="result-details"></div><div class="modal-actions"><button id="spinAgain" class="secondary-btn">再转一次</button><button id="confirmChoice" class="primary-btn">今天就吃它</button></div></dialog>
-  <dialog id="editDialog" class="modal edit-modal"><button class="modal-close" data-close="editDialog">×</button><h2 id="editTitle">添加餐厅</h2><form id="editForm"><input id="editId" type="hidden"><div id="restaurantFields"><label>餐厅名称<input id="restaurantName" maxlength="40"></label><label>所属菜系<select id="restaurantCuisine"></select></label><label>地址（选填）<input id="restaurantAddress" maxlength="120" placeholder="例如：市南区香港中路88号"></label><label>备注（选填）<textarea id="restaurantNote" maxlength="300" placeholder="招牌菜、预约提醒、停车信息……"></textarea></label></div><div id="cuisineFields" class="hidden"><label>菜系名称<input id="cuisineName" maxlength="20"></label><label>出现机会（1～10）<input id="cuisineWeight" type="number" min="1" max="10" value="1"></label></div><div id="menuFields" class="hidden"><label>名称<input id="menuName" maxlength="50"></label><label>图片<input id="menuImage" type="file" accept="image/*"><small class="field-help">手机照片会自动压缩后保存</small></label><img id="menuPreview" class="image-preview hidden" alt="图片预览"><label id="ingredientsLabel">食材<textarea id="menuIngredients" maxlength="500" placeholder="例如：鸡胸肉、糙米、西兰花……"></textarea></label><label>热量<input id="menuCalories" maxlength="40" placeholder="例如：约 420 千卡"></label></div><p id="editError" class="form-error"></p><button class="primary-btn" type="submit">保存好啦</button></form></dialog>
+  <dialog id="resultDialog" class="modal result-modal"><button class="modal-close" data-close="resultDialog">×</button><div class="confetti">♥　✦　♡　✿　♥</div><span class="eyebrow">LUCKY PICK</span><h2 id="resultTitle"></h2><p id="resultSubtitle"></p><blockquote id="resultBlessing" class="result-blessing"></blockquote><div id="resultDetails" class="result-details"></div><div class="modal-actions"><button id="spinAgain" class="secondary-btn">再转一次</button><button id="confirmChoice" class="primary-btn">今天就吃它</button></div></dialog>
+  <dialog id="editDialog" class="modal edit-modal"><button class="modal-close" data-close="editDialog">×</button><h2 id="editTitle">添加餐厅</h2><form id="editForm"><input id="editId" type="hidden"><div id="restaurantFields"><label>餐厅名称<input id="restaurantName" maxlength="40"></label><label>所属菜系<select id="restaurantCuisine"></select></label><label>地址（选填）<input id="restaurantAddress" maxlength="120" placeholder="例如：市南区香港中路88号"></label><label>备注（选填）<textarea id="restaurantNote" maxlength="300" placeholder="招牌菜、预约提醒、停车信息……"></textarea></label></div><div id="cuisineFields" class="hidden"><label>菜系名称<input id="cuisineName" maxlength="20"></label><label>出现机会（1～10）<input id="cuisineWeight" type="number" min="1" max="10" value="1"></label></div><div id="menuFields" class="hidden"><label>名称<input id="menuName" maxlength="50"></label><label>图片<input id="menuImage" type="file" accept="image/*"><small class="field-help">手机照片会自动压缩后保存</small></label><img id="menuPreview" class="image-preview hidden" alt="图片预览"><label id="ingredientsLabel">食材<textarea id="menuIngredients" maxlength="500" placeholder="例如：鸡胸肉、糙米、西兰花……"></textarea></label><label>热量<input id="menuCalories" maxlength="40" placeholder="例如：约 420 千卡"></label></div><div id="blessingFields" class="hidden"><label>祝福语<textarea id="blessingText" maxlength="120" placeholder="例如：今天的快乐，就从这一口开始吧～"></textarea></label></div><p id="editError" class="form-error"></p><button class="primary-btn" type="submit">保存好啦</button></form></dialog>
+  <dialog id="shareFallbackDialog" class="modal share-modal"><button class="modal-close" data-close="shareFallbackDialog">×</button><div class="login-art">💌</div><h2>邀请链接准备好啦</h2><p>长按或复制下面的链接发给朋友：</p><input id="shareFallbackLink" readonly><button id="copyFallbackLink" class="primary-btn">复制邀请链接</button></dialog>
   <div id="toast" class="toast" role="status"></div>
   <script src="/app.js" type="module"></script>
 </body>
