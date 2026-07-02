@@ -13,7 +13,7 @@
   <div class="theme-art" aria-hidden="true"><div class="theme-image theme-image-one"></div><div class="theme-image theme-image-two"></div><div class="theme-veil"></div></div>
   <div class="floaty floaty-one">♡</div><div class="floaty floaty-two">✿</div><div class="floaty floaty-three">♡</div>
   <header class="topbar">
-    <button class="brand" data-page="home"><span class="brand-badge">🍓</span><span>坤坤今天吃什么～</span></button>
+    <button class="brand" data-page="home"><span class="brand-badge">🍓</span><span data-copy="global.brandTitle">坤坤今天吃什么～</span></button>
     <nav aria-label="主导航">
       <button class="nav-btn active" data-page="home">抽菜系</button><button class="nav-btn" data-page="restaurant">抽餐厅</button><button class="nav-btn" data-page="directory">餐厅总览</button><button class="nav-btn" data-page="fitness">减脂餐</button><button class="nav-btn" data-page="night">夜宵</button><button class="nav-btn" data-page="history">今日记录</button>
     </nav>
@@ -22,7 +22,7 @@
 
   <main>
     <section id="homePage" class="page active">
-      <div class="hero-copy"><span class="eyebrow">TODAY'S LITTLE CHOICE</span><h1>坤坤今天吃什么～</h1><p>选择困难先放一放，让幸运转盘替你做决定吧！</p></div>
+      <div class="hero-copy"><span class="eyebrow">TODAY'S LITTLE CHOICE</span><h1 data-copy="home.title">坤坤今天吃什么～</h1><p data-copy="home.subtitle">选择困难先放一放，让幸运转盘替你做决定吧！</p></div>
       <div class="together-invite"><div><span class="invite-strawberries">🍓🍓🍓</span><strong>最多三个人一起决定</strong><p>分享给朋友，一起排除不想吃的，再同步转盘～</p></div><button id="createRoomBtn" class="primary-btn">坤坤想跟谁吃</button></div>
       <div class="preference-card">
         <div class="preference-head"><div><strong>今天不想吃什么？</strong><p>点一下临时排除，再点一下就恢复。</p></div><button id="resetExclusions" class="text-btn">全部恢复</button></div>
@@ -32,46 +32,46 @@
         <div class="decor decor-left">🍡</div><div class="decor decor-right">🍥</div>
         <div class="wheel-wrap"><div class="pointer">▼</div><div id="cuisineWheel" class="wheel"></div><button id="spinCuisine" class="wheel-center"><span>转</span><small>一下</small></button></div>
         <div class="choice-mode" data-kind="cuisine"><span>一次抽几个？</span><button class="mode-btn active" data-choice-kind="cuisine" data-count="1">抽 1 个</button><button class="mode-btn" data-choice-kind="cuisine" data-count="2">2 选 1</button><button class="mode-btn" data-choice-kind="cuisine" data-count="3">3 选 1</button></div>
-        <button id="spinCuisineBtn" class="primary-btn">帮坤坤选一选 <span>♥</span></button><p id="cuisineHint" class="hint">轻轻一点，命运的齿轮开始转动～</p>
+        <button id="spinCuisineBtn" class="primary-btn"><span data-copy="home.button">帮坤坤选一选</span> <span>♥</span></button><p id="cuisineHint" class="hint" data-copy-default="home.hint">轻轻一点，命运的齿轮开始转动～</p>
       </div>
     </section>
 
     <section id="restaurantPage" class="page">
-      <div class="section-heading"><span class="eyebrow">RESTAURANT WHEEL</span><h2>这顿去哪家？</h2><p>先选一个菜系，再转出今天的心动餐厅。</p></div>
+      <div class="section-heading"><span class="eyebrow">RESTAURANT WHEEL</span><h2 data-copy="restaurant.title">这顿去哪家？</h2><p data-copy="restaurant.subtitle">先选一个菜系，再转出今天的心动餐厅。</p></div>
       <div class="picker-card"><label for="cuisineSelect">想吃的菜系</label><select id="cuisineSelect"></select></div>
       <div id="restaurantEmpty" class="empty-state hidden"><div class="empty-icon">🥣</div><h3>这里还空空的</h3><p>这个菜系暂时没有餐厅，换一个试试吧～</p></div>
       <div id="restaurantWheelArea" class="wheel-card compact">
         <div class="wheel-wrap"><div class="pointer">▼</div><div id="restaurantWheel" class="wheel"></div><button id="spinRestaurant" class="wheel-center"><span>转</span><small>餐厅</small></button></div>
         <div class="choice-mode" data-kind="restaurant"><span>一次抽几家？</span><button class="mode-btn active" data-choice-kind="restaurant" data-count="1">抽 1 家</button><button class="mode-btn" data-choice-kind="restaurant" data-count="2">2 选 1</button><button class="mode-btn" data-choice-kind="restaurant" data-count="3">3 选 1</button></div>
-        <button id="spinRestaurantBtn" class="primary-btn">看看去哪家 <span>✦</span></button>
+        <button id="spinRestaurantBtn" class="primary-btn"><span data-copy="restaurant.button">看看去哪家</span> <span>✦</span></button>
       </div>
     </section>
 
     <section id="directoryPage" class="page">
-      <div class="section-heading"><span class="eyebrow">KUNKUN'S FOOD MAP</span><h2>菜系餐厅总览</h2><p>每个菜系里收藏了哪些餐厅，一眼就能找到。</p></div>
+      <div class="section-heading"><span class="eyebrow">KUNKUN'S FOOD MAP</span><h2 data-copy="directory.title">菜系餐厅总览</h2><p data-copy="directory.subtitle">每个菜系里收藏了哪些餐厅，一眼就能找到。</p></div>
       <div class="directory-tools"><input id="directorySearch" type="search" placeholder="搜索菜系、餐厅或地址……"><span id="directoryCount"></span></div>
       <div id="directoryList" class="directory-list"></div>
     </section>
 
     <section id="fitnessPage" class="page">
-      <div class="section-heading"><span class="eyebrow">HEALTHY & HAPPY</span><h2>坤坤减脂ing 🏋️</h2><p>坤坤的完美减脂美食～！</p></div>
+      <div class="section-heading"><span class="eyebrow">HEALTHY & HAPPY</span><h2 data-copy="fitness.title">坤坤减脂ing 🏋️</h2><p data-copy="fitness.subtitle">坤坤的完美减脂美食～！</p></div>
       <div id="fitnessEmpty" class="empty-state hidden"><div class="empty-icon">🥗</div><h3>减脂菜单还在准备</h3><p>登录管理模式添加第一份健康餐吧～</p></div>
-      <div id="fitnessWheelArea" class="wheel-card compact"><div class="wheel-wrap"><div class="pointer">▼</div><div id="fitnessWheel" class="wheel"></div><button id="spinFitness" class="wheel-center"><span>转</span><small>减脂餐</small></button></div><button id="spinFitnessBtn" class="primary-btn">今天健康吃什么 <span>🥬</span></button></div>
+      <div id="fitnessWheelArea" class="wheel-card compact"><div class="wheel-wrap"><div class="pointer">▼</div><div id="fitnessWheel" class="wheel"></div><button id="spinFitness" class="wheel-center"><span>转</span><small>减脂餐</small></button></div><button id="spinFitnessBtn" class="primary-btn"><span data-copy="fitness.button">今天健康吃什么</span> <span>🥬</span></button></div>
     </section>
 
     <section id="nightPage" class="page">
-      <div class="section-heading"><span class="eyebrow">MIDNIGHT LITTLE BITE</span><h2>半夜饿了，坤坤吃点什么呢？</h2><p>半夜偷偷吃一点，想必也不会胖吧～</p></div>
+      <div class="section-heading"><span class="eyebrow">MIDNIGHT LITTLE BITE</span><h2 data-copy="night.title">半夜饿了，坤坤吃点什么呢？</h2><p data-copy="night.subtitle">半夜偷偷吃一点，想必也不会胖吧～</p></div>
       <div id="nightEmpty" class="empty-state hidden"><div class="empty-icon">🌙</div><h3>夜宵小柜还是空的</h3><p>登录管理模式添加第一份夜宵吧～</p></div>
-      <div id="nightWheelArea" class="wheel-card compact"><div class="wheel-wrap"><div class="pointer">▼</div><div id="nightWheel" class="wheel"></div><button id="spinNight" class="wheel-center"><span>转</span><small>夜宵</small></button></div><button id="spinNightBtn" class="primary-btn">偷偷吃一点 <span>🌙</span></button></div>
+      <div id="nightWheelArea" class="wheel-card compact"><div class="wheel-wrap"><div class="pointer">▼</div><div id="nightWheel" class="wheel"></div><button id="spinNight" class="wheel-center"><span>转</span><small>夜宵</small></button></div><button id="spinNightBtn" class="primary-btn"><span data-copy="night.button">偷偷吃一点</span> <span>🌙</span></button></div>
     </section>
 
     <section id="historyPage" class="page">
-      <div class="section-heading"><span class="eyebrow">MY LITTLE FOOD DIARY</span><h2>今天的选择</h2><p>每一次转动，都悄悄留在这台设备里。</p></div>
+      <div class="section-heading"><span class="eyebrow">MY LITTLE FOOD DIARY</span><h2 data-copy="history.title">今天的选择</h2><p data-copy="history.subtitle">每一次转动，都悄悄留在这台设备里。</p></div>
       <div id="todayChoice" class="today-choice"></div><div class="history-card"><div class="card-title-row"><h3>最近抽到</h3><button id="clearHistory" class="text-btn">清空记录</button></div><div id="historyList" class="history-list"></div></div>
     </section>
 
     <section id="roomPage" class="page">
-      <div class="section-heading"><span class="eyebrow">EAT TOGETHER</span><h2>坤坤邀请你一起吃～</h2><p>三颗小草莓，一起选出大家都喜欢的味道。</p></div>
+      <div class="section-heading"><span class="eyebrow">EAT TOGETHER</span><h2 data-copy="room.title">坤坤邀请你一起吃～</h2><p data-copy="room.subtitle">三颗小草莓，一起选出大家都喜欢的味道。</p></div>
       <div class="room-top-card"><div id="roomPresence" class="room-presence"><strong>🍓</strong><span>1 人在线</span></div><button id="shareRoomBtn" class="secondary-btn">再邀请一位</button></div>
       <div id="roomJoinView" class="login-card room-join-card">
         <div class="login-art">🍓</div><h2>加入今天的饭局</h2><p>输入一个昵称，让大家知道是谁排除了什么。</p>
@@ -98,12 +98,13 @@
       <div id="dashboardView" class="dashboard hidden">
         <div class="dashboard-head"><div><span class="eyebrow">KUNKUN'S PANTRY</span><h2>美食管理小屋</h2></div><button id="logoutBtn" class="secondary-btn">退出登录</button></div>
         <div class="progress-grid"><div class="stat-card"><span>今日新增</span><strong id="todayProgress">0 / 3</strong><div class="progress"><i id="todayBar"></i></div></div><div class="stat-card"><span>连续完成</span><strong id="streak">0 天</strong><small>每天录入3家就算完成</small></div><div class="stat-card"><span>20天计划</span><strong id="daysProgress">0 / 20</strong><div class="progress"><i id="daysBar"></i></div></div></div>
-        <div class="admin-tabs"><button class="tab active" data-tab="restaurants">餐厅管理</button><button class="tab" data-tab="cuisines">菜系管理</button><button class="tab" data-tab="fitness">减脂餐</button><button class="tab" data-tab="night">夜宵</button><button class="tab" data-tab="blessings">祝福语</button></div>
+        <div class="admin-tabs"><button class="tab active" data-tab="restaurants">餐厅管理</button><button class="tab" data-tab="cuisines">菜系管理</button><button class="tab" data-tab="fitness">减脂餐</button><button class="tab" data-tab="night">夜宵</button><button class="tab" data-tab="blessings">祝福语</button><button class="tab" data-tab="copy">文案设置</button></div>
         <div id="restaurantsTab" class="admin-panel"><div class="panel-head"><div><h3>餐厅口袋</h3><p>每天放进三家，慢慢攒成你的专属地图。</p></div><button id="addRestaurantBtn" class="primary-btn small">＋ 添加餐厅</button></div><div class="filter-row"><select id="restaurantFilter"><option value="">全部菜系</option></select><span id="restaurantCount"></span></div><div id="restaurantAdminList" class="admin-list"></div></div>
         <div id="cuisinesTab" class="admin-panel hidden"><div class="panel-head"><div><h3>菜系花园</h3><p>调整顺序、出现机会，或暂时让它休息。</p></div><button id="addCuisineBtn" class="primary-btn small">＋ 添加菜系</button></div><div id="cuisineAdminList" class="admin-list"></div></div>
         <div id="fitnessTab" class="admin-panel hidden"><div class="panel-head"><div><h3>减脂菜单</h3><p>添加图片、名称、食材与热量。</p></div><button id="addFitnessBtn" class="primary-btn small">＋ 添加减脂餐</button></div><div id="fitnessAdminList" class="admin-list media-admin-list"></div></div>
         <div id="nightTab" class="admin-panel hidden"><div class="panel-head"><div><h3>夜宵小柜</h3><p>添加图片、名称与热量。</p></div><button id="addNightBtn" class="primary-btn small">＋ 添加夜宵</button></div><div id="nightAdminList" class="admin-list media-admin-list"></div></div>
         <div id="blessingsTab" class="admin-panel hidden"><div class="panel-head"><div><h3>可爱祝福语</h3><p>每次抽中后，随机送上一句好心情。</p></div><button id="addBlessingBtn" class="primary-btn small">＋ 添加祝福</button></div><div id="blessingAdminList" class="admin-list"></div></div>
+        <div id="copyTab" class="admin-panel hidden"><div class="panel-head"><div><h3>页面文案</h3><p>按页面修改标题、小字、主要按钮与转盘提示。</p></div></div><div id="copyAdminList" class="copy-admin-list"></div></div>
       </div>
     </section>
   </main>

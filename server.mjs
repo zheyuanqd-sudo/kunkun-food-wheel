@@ -24,6 +24,16 @@ const initialBlessings = [
   '好好吃饭，就是今天最温柔的小事～','幸运转盘说：这一口会超级满足！','吃饱饱，烦恼就会变得小小的～','今日份幸福正在热乎乎地赶来！',
   '愿这一餐有香气、有笑声，还有好心情～','被选中的美味，当然要认真享受啦！','今天也要和好吃的东西见面呀～','快乐无需理由，美食就是最好的答案 ♡'
 ];
+const initialSiteCopy = {
+  global: { brandTitle: '坤坤今天吃什么～' },
+  home: { title: '坤坤今天吃什么～', subtitle: '选择困难先放一放，让幸运转盘替你做决定吧！', button: '帮坤坤选一选', hint: '轻轻一点，命运的齿轮开始转动～' },
+  restaurant: { title: '这顿去哪家？', subtitle: '先选一个菜系，再转出今天的心动餐厅。', button: '看看去哪家' },
+  directory: { title: '菜系餐厅总览', subtitle: '每个菜系里收藏了哪些餐厅，一眼就能找到。' },
+  fitness: { title: '坤坤减脂ing 🏋️', subtitle: '坤坤的完美减脂美食～！', button: '今天健康吃什么' },
+  night: { title: '半夜饿了，坤坤吃点什么呢？', subtitle: '半夜偷偷吃一点，想必也不会胖吧～', button: '偷偷吃一点' },
+  history: { title: '今天的选择', subtitle: '每一次转动，都悄悄留在这台设备里。' },
+  room: { title: '坤坤邀请你一起吃～', subtitle: '三颗小草莓，一起选出大家都喜欢的味道。' }
+};
 const now = () => new Date().toISOString();
 const initialData = () => ({
   cuisines: initialCuisines.map((name, index) => ({ id: `c-${index + 1}`, name, enabled: true, weight: 1, order: index })),
@@ -31,6 +41,7 @@ const initialData = () => ({
   fitnessMeals: [],
   nightSnacks: [],
   blessings: initialBlessings.map((text,index)=>({id:`b-${index+1}`,text,enabled:true,order:index})),
+  siteCopy: structuredClone(initialSiteCopy),
   createdAt: now(),
   updatedAt: now()
 });
@@ -49,7 +60,7 @@ async function loadStore() {
     await pool.query('create table if not exists app_state (id bigint primary key check (id = 1), data jsonb not null, updated_at timestamptz not null default now())');
     await pool.query('create table if not exists shared_rooms (id text primary key, data jsonb not null, expires_at timestamptz not null, updated_at timestamptz not null default now())');
     const result = await pool.query('select data from app_state where id = 1');
-    if (result.rows[0]?.data) store = { ...initialData(), ...result.rows[0].data };
+    if (result.rows[0]?.data) store = { ...initialData(), ...result.rows[0].data, siteCopy: mergeSiteCopy(result.rows[0].data.siteCopy) };
     else {
       store = initialData();
       await pool.query('insert into app_state (id, data) values (1, $1::jsonb)', [JSON.stringify(store)]);
@@ -64,7 +75,7 @@ async function loadStore() {
   }
   try {
     const parsed = JSON.parse(await readFile(DATA_FILE, 'utf8'));
-    store = { ...initialData(), ...parsed };
+    store = { ...initialData(), ...parsed, siteCopy: mergeSiteCopy(parsed.siteCopy) };
   } catch {
     store = initialData();
     await saveStore();
@@ -115,12 +126,14 @@ async function body(req) {
   try { return JSON.parse(Buffer.concat(chunks).toString() || '{}'); } catch { throw new Error('内容格式不正确'); }
 }
 const clean = (value, max = 120) => String(value || '').trim().slice(0, max);
+const mergeSiteCopy = value => Object.fromEntries(Object.entries(initialSiteCopy).map(([section,defaults])=>[section,{...defaults,...(value?.[section]||{})}]));
 const publicState = () => ({
   cuisines: store.cuisines.slice().sort((a,b) => a.order - b.order),
   restaurants: store.restaurants.slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
   fitnessMeals: (store.fitnessMeals || []).slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
   nightSnacks: (store.nightSnacks || []).slice().sort((a,b) => b.createdAt.localeCompare(a.createdAt)),
   blessings: (store.blessings || []).filter(x=>x.enabled).slice().sort((a,b)=>a.order-b.order),
+  siteCopy: mergeSiteCopy(store.siteCopy),
   updatedAt: store.updatedAt
 });
 
@@ -213,7 +226,22 @@ async function api(req, res, url) {
   }
   if (url.pathname === '/api/admin/progress' && req.method === 'GET') { if (!requireAdmin(req,res)) return; return json(res, 200, progress()); }
   if (url.pathname === '/api/admin/blessings' && req.method === 'GET') { if (!requireAdmin(req,res)) return; return json(res,200,(store.blessings||[]).slice().sort((a,b)=>a.order-b.order)); }
+  if (url.pathname === '/api/admin/site-copy' && req.method === 'GET') { if (!requireAdmin(req,res)) return; return json(res,200,mergeSiteCopy(store.siteCopy)); }
   if (!requireAdmin(req, res)) return;
+
+  const copyMatch=url.pathname.match(/^\/api\/site-copy\/([a-z]+)$/);
+  if(copyMatch){
+    const section=copyMatch[1],defaults=initialSiteCopy[section];
+    if(!defaults)return json(res,404,{error:'没有找到这组页面文案'});
+    if(req.method==='PUT'){
+      const data=await body(req),next={};
+      for(const key of Object.keys(defaults)){const value=clean(data[key],key==='subtitle'?160:80);if(!value)return json(res,400,{error:'每一项文案都要填写哦'});next[key]=value;}
+      store.siteCopy=mergeSiteCopy(store.siteCopy);store.siteCopy[section]=next;await saveStore();return json(res,200,next);
+    }
+    if(req.method==='DELETE'){
+      store.siteCopy=mergeSiteCopy(store.siteCopy);store.siteCopy[section]={...defaults};await saveStore();return json(res,200,store.siteCopy[section]);
+    }
+  }
 
   if (url.pathname === '/api/cuisines' && req.method === 'POST') {
     const data = await body(req); const name = clean(data.name, 20);
