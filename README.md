@@ -14,10 +14,9 @@ npm start
 
 ## 正式上线
 
-项目包含 `Dockerfile` 和 `render.yaml`，可直接部署到支持持久磁盘的网页托管服务。正式部署时必须设置：
+项目包含 `Dockerfile` 和 `render.yaml`，可直接部署到 Render，并通过 Supabase 免费保存长期数据。正式部署时必须设置：
 
-- `ADMIN_PASSWORD_HASH`：管理员密码的安全加密结果（未设置时使用项目内置的初始密码加密值）。
 - `SESSION_SECRET`：随机生成的长字符串，用于保护登录状态。
-- `DATA_FILE`：持久磁盘内的数据文件路径。
+- `DATABASE_URL`：Supabase 数据库连接地址。
 
-餐厅和菜系保存在服务端数据文件中；个人抽签记录只保存在访问者自己的浏览器中。
+服务首次启动时会自动创建所需数据表。餐厅和菜系保存在 Supabase；个人抽签记录只保存在访问者自己的浏览器中。本地未配置 Supabase 时仍使用 `data/store.json`。
