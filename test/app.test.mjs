@@ -5,6 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
+import { normalizeAngle, segmentCenter, landingRotation, settledOffset } from '../public/wheel-math.js';
 
 const root = new URL('..', import.meta.url).pathname;
 const port = 32147;
@@ -83,6 +84,29 @@ test('默认祝福语可展示且管理员可维护',async()=>{
   const removed=await fetch(`http://127.0.0.1:${port}/api/blessings/${item.id}`,{method:'DELETE',headers:{'Cookie':cookie}});assert.equal(removed.status,200);
 });
 
+test('所有转盘连续停靠都与结果扇区一致',()=>{
+  for(const count of [1,2,3,5,8,12,16,30]){
+    let offset=0;
+    for(let round=0;round<35;round++){
+      const index=(round*7+count-1)%count,rotation=landingRotation(offset,index,count,round%2?3:5);
+      assert.ok(rotation>=1080);
+      offset=settledOffset(offset,index,count);
+      assert.ok(Math.abs(normalizeAngle(segmentCenter(index,count)+offset)-270)<1e-8);
+    }
+  }
+});
+
+test('管理员可以修改并恢复主要页面文案',async()=>{
+  const initial=await (await fetch(`http://127.0.0.1:${port}/api/state`)).json();
+  assert.equal(initial.siteCopy.global.brandTitle,'坤坤今天吃什么～');
+  const changed=await fetch(`http://127.0.0.1:${port}/api/site-copy/home`,{method:'PUT',headers:{'Content-Type':'application/json','Cookie':cookie},body:JSON.stringify({title:'测试可爱标题',subtitle:'测试小字',button:'测试按钮',hint:'测试提示'})});
+  assert.equal(changed.status,200);
+  const after=await (await fetch(`http://127.0.0.1:${port}/api/state`)).json();assert.equal(after.siteCopy.home.title,'测试可爱标题');
+  const denied=await fetch(`http://127.0.0.1:${port}/api/site-copy/home`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'访客修改',subtitle:'测试',button:'测试',hint:'测试'})});assert.equal(denied.status,401);
+  const reset=await fetch(`http://127.0.0.1:${port}/api/site-copy/home`,{method:'DELETE',headers:{'Cookie':cookie}});assert.equal(reset.status,200);
+  const restored=await (await fetch(`http://127.0.0.1:${port}/api/state`)).json();assert.equal(restored.siteCopy.home.title,'坤坤今天吃什么～');
+});
+
 test('三人房间同步在线、排除和两级转盘',async()=>{
   const created=await fetch(`http://127.0.0.1:${port}/api/rooms`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(created.status,201);const room=await created.json();assert.ok(new Date(room.expiresAt)-Date.now()<=86400000);
   const joiner=async nickname=>{const r=await fetch(`http://127.0.0.1:${port}/api/rooms/${room.roomId}/join`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname})});assert.equal(r.status,200);return r.json();};
@@ -111,6 +135,7 @@ test('页面与静态资源可以打开',async()=>{
   assert.match(html,/坤坤想跟谁吃/);
   assert.match(html,/坤坤邀请你一起吃/);
   assert.equal((await fetch(`http://127.0.0.1:${port}/app.js`)).status,200);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/wheel-math.js`)).status,200);
   assert.equal((await fetch(`http://127.0.0.1:${port}/styles.css`)).status,200);
   assert.equal((await fetch(`http://127.0.0.1:${port}/assets/kunkun-stars-1.jpg`)).status,200);
   assert.equal((await fetch(`http://127.0.0.1:${port}/assets/kunkun-stars-2.jpg`)).status,200);
